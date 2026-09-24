@@ -1,4 +1,4 @@
-import { Calendar, Trash2, Edit3, Check } from 'lucide-react'
+import { Calendar, Trash2, Edit3, CheckCircle, Clock } from 'lucide-react'
 import { Task } from '@/types/task'
 import { TaskPriorityBadge, TaskStatusBadge } from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'
@@ -15,8 +15,8 @@ export function TaskCard({ task, onToggleStatus, onEdit, onDelete }: TaskCardPro
 
   return (
     <div
-      className={`group p-4 bg-white rounded-2xl border transition-all duration-200 shadow-sm hover:shadow-md ${
-        isDone ? 'border-slate-200/60 bg-slate-50/50' : 'border-slate-200/90 hover:border-indigo-200'
+      className={`group p-4 bg-white rounded-2xl border transition-all duration-150 shadow-xs hover:shadow-sm ${
+        isDone ? 'border-slate-200/60 bg-slate-50/40' : 'border-slate-200/90 hover:border-slate-300'
       }`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -26,7 +26,7 @@ export function TaskCard({ task, onToggleStatus, onEdit, onDelete }: TaskCardPro
             <TaskStatusBadge status={task.status} onClick={() => onToggleStatus(task)} />
             <TaskPriorityBadge priority={task.priority} />
             {task.dueDate && (
-              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500">
+              <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100/70 px-2 py-0.5 rounded-md">
                 <Calendar className="w-3 h-3 text-slate-400" />
                 {formatDate(task.dueDate)}
               </span>
@@ -36,7 +36,7 @@ export function TaskCard({ task, onToggleStatus, onEdit, onDelete }: TaskCardPro
           {/* Title */}
           <h3
             className={`text-sm font-semibold tracking-tight transition-colors ${
-              isDone ? 'line-through text-slate-400' : 'text-slate-900 group-hover:text-indigo-600'
+              isDone ? 'line-through text-slate-400' : 'text-slate-900'
             }`}
           >
             {task.title}
@@ -44,27 +44,27 @@ export function TaskCard({ task, onToggleStatus, onEdit, onDelete }: TaskCardPro
 
           {/* Description */}
           {task.description && (
-            <p className={`text-xs leading-relaxed line-clamp-2 ${isDone ? 'text-slate-400' : 'text-slate-500'}`}>
+            <p className={`text-xs leading-relaxed line-clamp-2 ${isDone ? 'text-slate-400' : 'text-slate-600'}`}>
               {task.description}
             </p>
           )}
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Controls */}
         <div className="flex items-center gap-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
           <button
             type="button"
             onClick={() => onToggleStatus(task)}
-            title="Mark as done / cycle status"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 transition"
+            title="Cycle next status"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 transition"
           >
-            <Check className="w-4 h-4" />
+            <CheckCircle className="w-4 h-4" />
           </button>
           <button
             type="button"
             onClick={() => onEdit(task)}
-            title="Edit task"
-            className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
+            title="Edit task details"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition"
           >
             <Edit3 className="w-4 h-4" />
           </button>

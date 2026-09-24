@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { PlusCircle } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
@@ -26,7 +26,7 @@ export function TaskCreateForm({ onSubmit, isLoading }: TaskCreateFormProps) {
     if (!title.trim()) {
       newErrors.title = 'Title is required'
     } else if (title.trim().length < 3) {
-      newErrors.title = 'Title must be at least 3 characters'
+      newErrors.title = 'Minimum 3 characters required'
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -55,16 +55,21 @@ export function TaskCreateForm({ onSubmit, isLoading }: TaskCreateFormProps) {
   }
 
   return (
-    <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm sticky top-24">
-      <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-100">
-        <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
-        <h2 className="text-base font-bold text-slate-900 tracking-tight">Create New Task</h2>
+    <div className="bg-white p-5 rounded-2xl border border-slate-200/90 shadow-xs sticky top-24">
+      <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100">
+        <div>
+          <h2 className="text-sm font-bold text-slate-900 tracking-tight">Create Task</h2>
+          <p className="text-[11px] text-slate-400">Add an action item to the public board</p>
+        </div>
+        <span className="p-1 rounded-lg bg-blue-50 text-blue-600">
+          <Sparkles className="w-3.5 h-3.5" />
+        </span>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3.5">
         <Input
           label="Title *"
-          placeholder="e.g., Integrate Supabase Auth"
+          placeholder="e.g., Set up Prisma connection pooler"
           value={title}
           onChange={(e) => {
             setTitle(e.target.value)
@@ -75,15 +80,15 @@ export function TaskCreateForm({ onSubmit, isLoading }: TaskCreateFormProps) {
 
         <Textarea
           label="Description"
-          placeholder="Brief details or acceptance criteria..."
+          placeholder="Acceptance criteria or implementation notes..."
           value={description}
           onChange={(e) => setDescription(e.target.value)}
           rows={3}
         />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-2.5">
           <Select
-            label="Status"
+            label="Initial Status"
             value={status}
             onChange={(e) => setStatus(e.target.value as TaskStatus)}
             options={[
@@ -94,7 +99,7 @@ export function TaskCreateForm({ onSubmit, isLoading }: TaskCreateFormProps) {
           />
 
           <Select
-            label="Priority"
+            label="Priority Level"
             value={priority}
             onChange={(e) => setPriority(e.target.value as TaskPriority)}
             options={[
@@ -108,15 +113,19 @@ export function TaskCreateForm({ onSubmit, isLoading }: TaskCreateFormProps) {
 
         <Input
           type="date"
-          label="Due Date"
+          label="Target Due Date"
           value={dueDate}
           onChange={(e) => setDueDate(e.target.value)}
         />
 
-        <Button type="submit" className="w-full mt-2" isLoading={isLoading}>
-          <PlusCircle className="w-4 h-4 mr-1.5" />
-          Add Task
-        </Button>
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="w-full mt-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
+        >
+          <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+          <span>{isLoading ? 'Creating Task...' : 'Publish Task'}</span>
+        </button>
       </form>
     </div>
   )
