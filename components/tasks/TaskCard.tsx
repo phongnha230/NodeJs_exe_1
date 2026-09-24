@@ -1,4 +1,4 @@
-import { Calendar, Trash2, Edit3, CheckCircle, Clock } from 'lucide-react'
+import { Calendar, Trash2, Edit3, CheckCircle } from 'lucide-react'
 import { Task } from '@/types/task'
 import { TaskPriorityBadge, TaskStatusBadge } from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'

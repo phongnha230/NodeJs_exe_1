@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { CheckSquare, Users, LogIn, ExternalLink, Database } from 'lucide-react'
+import { CheckSquare, Users, LogIn, Database } from 'lucide-react'
 
 export function Navbar() {
   return (

@@ -14,16 +14,36 @@ export function useTasks(initialStatus?: TaskStatus | 'ALL') {
     try {
       const data = await taskService.getAll(initialStatus)
       setTasks(data)
-    } catch (err: any) {
-      setError(err.message || 'Error fetching tasks')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error fetching tasks'
+      setError(message)
     } finally {
       setIsLoading(false)
     }
   }, [initialStatus])
 
   useEffect(() => {
-    fetchTasks()
-  }, [fetchTasks])
+    let isSubscribed = true
+    taskService
+      .getAll(initialStatus)
+      .then((data) => {
+        if (isSubscribed) {
+          setTasks(data)
+          setIsLoading(false)
+        }
+      })
+      .catch((err: unknown) => {
+        if (isSubscribed) {
+          const message = err instanceof Error ? err.message : 'Error fetching tasks'
+          setError(message)
+          setIsLoading(false)
+        }
+      })
+
+    return () => {
+      isSubscribed = false
+    }
+  }, [initialStatus])
 
   const createTask = async (dto: CreateTaskDTO): Promise<boolean> => {
     setIsMutating(true)
@@ -32,8 +52,9 @@ export function useTasks(initialStatus?: TaskStatus | 'ALL') {
       const newTask = await taskService.create(dto)
       setTasks((prev) => [newTask, ...prev])
       return true
-    } catch (err: any) {
-      setError(err.message || 'Error creating task')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error creating task'
+      setError(message)
       return false
     } finally {
       setIsMutating(false)
@@ -47,8 +68,9 @@ export function useTasks(initialStatus?: TaskStatus | 'ALL') {
       const updated = await taskService.update(id, dto)
       setTasks((prev) => prev.map((t) => (t.id === id ? updated : t)))
       return true
-    } catch (err: any) {
-      setError(err.message || 'Error updating task')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error updating task'
+      setError(message)
       return false
     } finally {
       setIsMutating(false)
@@ -62,8 +84,9 @@ export function useTasks(initialStatus?: TaskStatus | 'ALL') {
       await taskService.delete(id)
       setTasks((prev) => prev.filter((t) => t.id !== id))
       return true
-    } catch (err: any) {
-      setError(err.message || 'Error deleting task')
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Error deleting task'
+      setError(message)
       return false
     } finally {
       setIsMutating(false)

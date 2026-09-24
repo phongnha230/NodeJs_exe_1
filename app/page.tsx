@@ -9,7 +9,7 @@ import { TaskFilterBar } from '@/components/tasks/TaskFilterBar'
 import { TaskList } from '@/components/tasks/TaskList'
 import { TaskEditModal } from '@/components/tasks/TaskEditModal'
 import { Task } from '@/types/task'
-import { AlertCircle, RefreshCw, Terminal, Layers } from 'lucide-react'
+import { AlertCircle, RefreshCw, Layers } from 'lucide-react'
 
 export default function HomePage() {
   const {
