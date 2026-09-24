@@ -1,36 +1,157 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# TaskFlow – Task & Team Management Web Application
 
-## Getting Started
+> **Assignment 1:** Technical Foundation, Prisma ORM, PostgreSQL Database & Vercel Deployment.
 
-First, run the development server:
+---
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## 📌 Project Overview
+TaskFlow is a modern Task & Team Management application designed to demonstrate a robust fullstack architecture. It is built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, and **Prisma ORM** connected to a cloud-hosted **PostgreSQL database on Supabase**.
+
+### Key Features (Assignment 1)
+- **Public Task CRUD:** Visitors can create, view, update status/priority/details, and delete tasks without authentication.
+- **Client-Side Validation & Filtering:** Instant filtering by Status (`TODO`, `IN_PROGRESS`, `DONE`), Priority (`LOW`, `MEDIUM`, `HIGH`, `URGENT`), and title/description search.
+- **Metric Dashboard:** Live summary cards displaying task distribution.
+- **Clean Senior Architecture:** Separation of Concerns with dedicated `services/`, `hooks/`, `components/ui/`, and feature-based modules.
+- **Teams Preview:** Placeholder page prepared for multi-tenant collaboration in Assignment 2.
+
+---
+
+## 🏛️ System Architecture
+
+```mermaid
+flowchart TD
+    subgraph Client["Frontend Client (Browser)"]
+        UI["React 19 Components (app/page.tsx)"]
+        Hooks["Custom Hooks: useTasks & useTaskFilter"]
+        Services["API Client: task.service.ts"]
+        UI --> Hooks --> Services
+    end
+
+    subgraph Server["Next.js Backend Server (Vercel Serverless)"]
+        Routes["Route Handlers: /api/tasks & /api/tasks/[id]"]
+        PrismaClient["Prisma Client Singleton (lib/prisma.ts)"]
+        Services -->|HTTP JSON REST| Routes
+        Routes --> PrismaClient
+    end
+
+    subgraph Database["Supabase PostgreSQL Cloud"]
+        Pooler["Transaction Pooler (Port 6543 - PgBouncer)"]
+        Postgres[("PostgreSQL Database")]
+        PrismaClient --> Pooler --> Postgres
+    end
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+---
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 🗄️ Database Design (Entity-Relationship Diagram)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```mermaid
+erDiagram
+    User ||--o{ Team : "owns"
+    User ||--o{ TeamMember : "belongs to"
+    User ||--o{ Task : "assigned to"
+    Team ||--o{ TeamMember : "has"
+    Team ||--o{ Task : "contains"
 
-## Learn More
+    User {
+        string id PK
+        string name
+        string email UK
+        string password
+        datetime createdAt
+        datetime updatedAt
+    }
 
-To learn more about Next.js, take a look at the following resources:
+    Team {
+        string id PK
+        string name
+        string description
+        string ownerId FK
+        datetime createdAt
+        datetime updatedAt
+    }
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+    TeamMember {
+        string id PK
+        string teamId FK
+        string userId FK
+        Role role "OWNER | ADMIN | MEMBER"
+        datetime joinedAt
+    }
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+    Task {
+        string id PK
+        string title
+        string description
+        TaskStatus status "TODO | IN_PROGRESS | DONE"
+        TaskPriority priority "LOW | MEDIUM | HIGH | URGENT"
+        datetime dueDate
+        string teamId FK "Nullable (Ass 1)"
+        string assigneeId FK "Nullable (Ass 1)"
+        datetime createdAt
+        datetime updatedAt
+    }
+```
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 📂 Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```text
+├── app/
+│   ├── api/tasks/             # REST Route Handlers (GET, POST, PUT, DELETE)
+│   ├── teams/                 # Teams placeholder (Assignment 2 preparation)
+│   ├── globals.css            # Tailwind CSS styling
+│   ├── layout.tsx             # Shared root layout (Navbar & Footer)
+│   └── page.tsx               # Orchestrator Task Dashboard page
+├── components/
+│   ├── layout/                # Navbar, Footer
+│   ├── tasks/                 # Feature: TaskStats, TaskCard, TaskList, TaskCreateForm, TaskEditModal
+│   └── ui/                    # Reusable primitives: Button, Input, Select, Badge, Modal
+├── hooks/                     # useTasks.ts, useTaskFilter.ts
+├── lib/                       # prisma.ts (Singleton), utils.ts
+├── prisma/
+│   ├── migrations/            # Migration history
+│   └── schema.prisma          # Database schema (4 models)
+├── services/                  # task.service.ts
+└── types/                     # task.ts, user.ts, team.ts
+```
+
+---
+
+## 🚀 Getting Started
+
+### 1. Prerequisites
+- Node.js 18+ installed
+- PostgreSQL instance (or free Supabase project)
+
+### 2. Environment Variables
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Fill in your Supabase connection strings:
+```env
+DATABASE_URL="postgresql://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:6543/postgres?pgbouncer=true"
+DIRECT_URL="postgresql://postgres.[REF]:[PASSWORD]@aws-0-[REGION].pooler.supabase.com:5432/postgres"
+```
+
+### 3. Database Migration
+```bash
+npx prisma migrate dev
+npx prisma generate
+```
+
+### 4. Run Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+## 🌐 Deployment on Vercel
+1. Push this repository to GitHub.
+2. Import the project on [Vercel](https://vercel.com).
+3. Set the Environment Variables (`DATABASE_URL` and `DIRECT_URL`) under **Settings > Environment Variables**.
+4. Click **Deploy**.
