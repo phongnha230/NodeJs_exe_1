@@ -1,0 +1,112 @@
+'use client'
+
+import React, { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/AuthContext'
+import { CheckSquare, UserPlus, AlertCircle } from 'lucide-react'
+import { Input } from '@/components/ui/Input'
+
+export default function RegisterPage() {
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const { register } = useAuth()
+  const router = useRouter()
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim() || !email.trim() || !password) {
+      setError('Please fill in all fields.')
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.')
+      return
+    }
+
+    setError(null)
+    setLoading(true)
+
+    try {
+      await register(name.trim(), email.trim(), password)
+      router.push('/teams')
+      router.refresh()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Registration failed. Please try again.'
+      setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="max-w-md mx-auto py-12 px-4 sm:px-0">
+      <div className="bg-white p-7 rounded-2xl border border-slate-200/90 shadow-sm">
+        {/* Brand Header */}
+        <div className="text-center mb-6">
+          <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-sm">
+            <CheckSquare className="w-5 h-5 stroke-[2.2]" />
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 tracking-tight">Create an Account</h1>
+          <p className="text-xs text-slate-500 mt-1">Start collaborating with teams on TaskFlow</p>
+        </div>
+
+        {error && (
+          <div className="mb-4 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        <form onSubmit={handleRegister} className="space-y-4">
+          <Input
+            label="Full Name *"
+            placeholder="John Doe"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Email Address *"
+            type="email"
+            placeholder="john@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+
+          <Input
+            label="Password *"
+            type="password"
+            placeholder="At least 6 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full mt-2 py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs rounded-xl shadow-xs transition-all duration-150 flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50"
+          >
+            <UserPlus className="w-4 h-4 stroke-[2.2]" />
+            <span>{loading ? 'Creating Account...' : 'Register'}</span>
+          </button>
+        </form>
+
+        <div className="mt-6 pt-4 border-t border-slate-100 text-center text-xs text-slate-500">
+          Already have an account?{' '}
+          <Link href="/login" className="font-semibold text-blue-600 hover:text-blue-700">
+            Sign in
+          </Link>
+        </div>
+      </div>
+    </div>
+  )
+}

@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { Navbar } from '@/components/layout/Navbar'
 import { Footer } from '@/components/layout/Footer'
+import { AuthProvider } from '@/context/AuthContext'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: 'TaskFlow – Task & Team Management App',
-  description: 'Assignment 1: Task & Team Management with Next.js App Router, Prisma ORM, and Supabase PostgreSQL.',
+  description: 'Assignment 2: Task & Team Management with Authentication, Prisma ORM, and Supabase PostgreSQL.',
 }
 
 export default function RootLayout({
@@ -29,11 +30,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col bg-slate-50/70 text-slate-900 selection:bg-indigo-100 selection:text-indigo-900`}
       >
-        <Navbar />
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
-        <Footer />
+        <AuthProvider>
+          <Navbar />
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {children}
+          </main>
+          <Footer />
+        </AuthProvider>
       </body>
     </html>
   )

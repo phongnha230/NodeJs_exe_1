@@ -11,7 +11,7 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// 1. Phân quyền thành viên nhóm (Sẵn sàng cho Assignment 2 & 3)
+// 1. Phân quyền thành viên nhóm
 enum Role {
   OWNER
   ADMIN
@@ -33,12 +33,12 @@ enum TaskPriority {
   URGENT
 }
 
-// Model 1: Người dùng hệ thống
+// Model 1: Người dùng hệ thống (Đồng bộ với Supabase Auth)
 model User {
   id            String       @id @default(cuid())
   name          String
   email         String       @unique
-  password      String       // Sẽ dùng cho hash password ở Assignment 2
+  password      String?      // Optional nếu đăng ký qua Supabase Auth
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
 
@@ -46,6 +46,7 @@ model User {
   ownedTeams    Team[]       @relation("TeamOwner")
   memberships   TeamMember[]
   assignedTasks Task[]       @relation("AssignedTasks")
+  createdTasks  Task[]       @relation("CreatedTasks")
 
   @@map("users")
 }
@@ -83,7 +84,7 @@ model TeamMember {
   @@map("team_members")
 }
 
-// Model 4: Quản lý công việc (Trọng tâm cho Assignment 1)
+// Model 4: Quản lý công việc
 model Task {
   id          String        @id @default(cuid())
   title       String
@@ -94,12 +95,17 @@ model Task {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  // Quan hệ (Optional ở Assignment 1 để public CRUD tự do)
+  // Quan hệ Team
   teamId      String?
-  team        Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  team        Team?         @relation(fields: [teamId], references: [id], onDelete: Cascade)
 
+  // Người được phân công
   assigneeId  String?
   assignee    User?         @relation("AssignedTasks", fields: [assigneeId], references: [id], onDelete: SetNull)
+
+  // Người tạo công việc (Dùng cho quyền xóa task theo Assignment 2)
+  creatorId   String?
+  creator     User?         @relation("CreatedTasks", fields: [creatorId], references: [id], onDelete: SetNull)
 
   @@map("tasks")
 }
