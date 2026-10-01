@@ -20,13 +20,16 @@ import {
   AlertCircle,
   Edit3,
   UserCheck,
+  Kanban,
+  List,
+  ArrowRight,
 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
 import { Textarea } from '@/components/ui/Textarea'
 import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
-import { TaskPriorityBadge, TaskStatusBadge } from '@/components/ui/Badge'
+import { TaskPriorityBadge } from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'
 
 export default function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -41,7 +44,8 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Status Filter
+  // View Mode: Kanban vs List (Bonus feature)
+  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('KANBAN')
   const [statusFilter, setStatusFilter] = useState<'ALL' | TaskStatus>('ALL')
 
   // Modals
@@ -198,7 +202,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const handleToggleTaskStatus = async (task: Task) => {
+  const handleCycleStatus = async (task: Task) => {
     const cycleMap: Record<TaskStatus, TaskStatus> = {
       TODO: 'IN_PROGRESS',
       IN_PROGRESS: 'DONE',
@@ -216,7 +220,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const handleDeleteTask = async (task: Task) => {
-    if (!confirm('Delete this task?')) return
+    if (!confirm('Are you sure you want to delete this task?')) return
     try {
       await taskService.delete(task.id)
       setTasks((prev) => prev.filter((t) => t.id !== task.id))
@@ -247,16 +251,21 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  const filteredTasks = tasks.filter((t) => {
+  // Kanban Column Filter
+  const todoTasks = tasks.filter((t) => t.status === 'TODO')
+  const inProgressTasks = tasks.filter((t) => t.status === 'IN_PROGRESS')
+  const doneTasks = tasks.filter((t) => t.status === 'DONE')
+
+  const filteredListTasks = tasks.filter((t) => {
     if (statusFilter === 'ALL') return true
     return t.status === statusFilter
   })
 
   if (loading) {
     return (
-      <div className="py-20 text-center">
+      <div className="py-24 text-center">
         <div className="w-8 h-8 mx-auto mb-3 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs text-slate-500">Loading team workspace...</p>
+        <p className="text-xs text-slate-500 font-medium">Synchronizing workspace data...</p>
       </div>
     )
   }
@@ -277,9 +286,90 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     )
   }
 
+  // Render Single Task Item
+  const renderTaskCard = (t: Task) => {
+    const isDone = t.status === 'DONE'
+    const canDelete = t.creatorId === user?.id || t.assigneeId === user?.id || isOwner
+
+    return (
+      <div
+        key={t.id}
+        className={`p-4 bg-white rounded-2xl border transition-all duration-150 shadow-xs hover:shadow-sm ${
+          isDone ? 'border-slate-200/60 bg-slate-50/40' : 'border-slate-200/90 hover:border-slate-300'
+        }`}
+      >
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center justify-between gap-1.5">
+            <TaskPriorityBadge priority={t.priority} />
+            {t.dueDate && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-medium text-slate-500">
+                <Calendar className="w-3 h-3 text-slate-400" />
+                {formatDate(t.dueDate)}
+              </span>
+            )}
+          </div>
+
+          <h4
+            className={`text-xs font-bold tracking-tight ${
+              isDone ? 'line-through text-slate-400' : 'text-slate-900'
+            }`}
+          >
+            {t.title}
+          </h4>
+
+          {t.description && (
+            <p className={`text-[11px] leading-relaxed line-clamp-2 ${isDone ? 'text-slate-400' : 'text-slate-600'}`}>
+              {t.description}
+            </p>
+          )}
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
+            {t.assignee ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                <UserCheck className="w-3 h-3 text-blue-500" />
+                {t.assignee.name}
+              </span>
+            ) : (
+              <span className="text-[10px] text-slate-400 italic">Unassigned</span>
+            )}
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => handleCycleStatus(t)}
+                title="Cycle status"
+                className="p-1 rounded-md text-slate-400 hover:text-blue-600 hover:bg-slate-100 transition"
+              >
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingTask(t)}
+                title="Edit task"
+                className="p-1 rounded-md text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+              </button>
+              {canDelete && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteTask(t)}
+                  title="Delete task (Authorized)"
+                  className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-7">
-      {/* Top Breadcrumb & Controls */}
+      {/* 1. Header with Breadcrumb & Settings */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200/80">
         <div>
           <Link
@@ -407,24 +497,53 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* Right Column: Tasks Board (8 cols) */}
+        {/* Right Column: Tasks Board with Kanban Toggle (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
-            {/* Filter Tabs */}
-            <div className="inline-flex p-1 bg-slate-100/90 rounded-xl gap-1">
-              {(['ALL', 'TODO', 'IN_PROGRESS', 'DONE'] as const).map((st) => (
+          {/* Controls Bar: View Toggle & Action */}
+          <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1">
                 <button
-                  key={st}
-                  onClick={() => setStatusFilter(st)}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
-                    statusFilter === st
+                  type="button"
+                  onClick={() => setViewMode('KANBAN')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === 'KANBAN'
                       ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900'
+                      : 'text-slate-500 hover:text-slate-900'
                   }`}
                 >
-                  {st === 'ALL' ? 'All' : st.replace('_', ' ')}
+                  <Kanban className="w-3.5 h-3.5" />
+                  Kanban Board
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setViewMode('LIST')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === 'LIST'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  List View
+                </button>
+              </div>
+
+              {viewMode === 'LIST' && (
+                <div className="hidden sm:inline-flex p-1 bg-slate-100 rounded-xl gap-1">
+                  {(['ALL', 'TODO', 'IN_PROGRESS', 'DONE'] as const).map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setStatusFilter(st)}
+                      className={`px-2.5 py-1 text-[11px] font-semibold rounded-lg transition ${
+                        statusFilter === st ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500'
+                      }`}
+                    >
+                      {st === 'ALL' ? 'All' : st.replace('_', ' ')}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <Button
@@ -437,104 +556,86 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
             </Button>
           </div>
 
-          {/* Tasks Container */}
-          {filteredTasks.length === 0 ? (
-            <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-xs">
-              <CheckCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-              <h3 className="text-sm font-semibold text-slate-900">No tasks in this filter</h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto mb-4">
-                Assign tasks to team members to keep projects moving forward.
-              </p>
-              <Button onClick={() => setIsCreateTaskOpen(true)} size="sm">
-                <Plus className="w-3.5 h-3.5 mr-1" /> Create Task
-              </Button>
+          {/* Kanban Board View (Bonus Marks) */}
+          {viewMode === 'KANBAN' ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+              {/* Column 1: To Do */}
+              <div className="bg-slate-100/60 p-3 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between px-1 py-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500" />
+                    <span className="text-xs font-bold text-slate-800">To Do</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    {todoTasks.length}
+                  </span>
+                </div>
+                <div className="space-y-2.5 min-h-[140px]">
+                  {todoTasks.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400 italic">No tasks to do</div>
+                  ) : (
+                    todoTasks.map(renderTaskCard)
+                  )}
+                </div>
+              </div>
+
+              {/* Column 2: In Progress */}
+              <div className="bg-slate-100/60 p-3 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between px-1 py-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-blue-500" />
+                    <span className="text-xs font-bold text-slate-800">In Progress</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    {inProgressTasks.length}
+                  </span>
+                </div>
+                <div className="space-y-2.5 min-h-[140px]">
+                  {inProgressTasks.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400 italic">No active tasks</div>
+                  ) : (
+                    inProgressTasks.map(renderTaskCard)
+                  )}
+                </div>
+              </div>
+
+              {/* Column 3: Done */}
+              <div className="bg-slate-100/60 p-3 rounded-2xl border border-slate-200/80 space-y-3">
+                <div className="flex items-center justify-between px-1 py-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    <span className="text-xs font-bold text-slate-800">Done</span>
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-500 bg-white px-2 py-0.5 rounded-full border border-slate-200">
+                    {doneTasks.length}
+                  </span>
+                </div>
+                <div className="space-y-2.5 min-h-[140px]">
+                  {doneTasks.length === 0 ? (
+                    <div className="p-6 text-center text-xs text-slate-400 italic">No completed tasks</div>
+                  ) : (
+                    doneTasks.map(renderTaskCard)
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
+            /* Traditional List View */
             <div className="space-y-3">
-              {filteredTasks.map((t) => {
-                const isDone = t.status === 'DONE'
-                // Quyền xóa: Task Creator, Assignee, hoặc Team Owner
-                const canDelete =
-                  t.creatorId === user?.id || t.assigneeId === user?.id || isOwner
-
-                return (
-                  <div
-                    key={t.id}
-                    className={`p-4 bg-white rounded-2xl border transition-all duration-150 shadow-xs hover:shadow-sm ${
-                      isDone
-                        ? 'border-slate-200/60 bg-slate-50/40'
-                        : 'border-slate-200/90 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 space-y-1.5">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <TaskStatusBadge
-                            status={t.status}
-                            onClick={() => handleToggleTaskStatus(t)}
-                          />
-                          <TaskPriorityBadge priority={t.priority} />
-
-                          {t.dueDate && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 bg-slate-100/70 px-2 py-0.5 rounded-md">
-                              <Calendar className="w-3 h-3 text-slate-400" />
-                              {formatDate(t.dueDate)}
-                            </span>
-                          )}
-
-                          {t.assignee && (
-                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-md">
-                              <UserCheck className="w-3 h-3 text-blue-500" />
-                              {t.assignee.name}
-                            </span>
-                          )}
-                        </div>
-
-                        <h3
-                          className={`text-sm font-semibold tracking-tight ${
-                            isDone ? 'line-through text-slate-400' : 'text-slate-900'
-                          }`}
-                        >
-                          {t.title}
-                        </h3>
-
-                        {t.description && (
-                          <p
-                            className={`text-xs leading-relaxed line-clamp-2 ${
-                              isDone ? 'text-slate-400' : 'text-slate-600'
-                            }`}
-                          >
-                            {t.description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditingTask(t)}
-                          title="Edit task"
-                          className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition"
-                        >
-                          <Edit3 className="w-4 h-4" />
-                        </button>
-
-                        {canDelete && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteTask(t)}
-                            title="Delete task (Authorized)"
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
+              {filteredListTasks.length === 0 ? (
+                <div className="p-12 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-xs">
+                  <CheckCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                  <h3 className="text-sm font-semibold text-slate-900">No tasks in this filter</h3>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto mb-4">
+                    Assign tasks to team members to keep projects moving forward.
+                  </p>
+                  <Button onClick={() => setIsCreateTaskOpen(true)} size="sm">
+                    <Plus className="w-3.5 h-3.5 mr-1" /> Create Task
+                  </Button>
+                </div>
+              ) : (
+                filteredListTasks.map(renderTaskCard)
+              )}
             </div>
           )}
         </div>
