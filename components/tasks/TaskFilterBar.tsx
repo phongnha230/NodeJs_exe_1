@@ -45,6 +45,7 @@ export function TaskFilterBar({
           <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"
+            aria-label="Search tasks"
             placeholder="Search by task title or criteria..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -57,6 +58,7 @@ export function TaskFilterBar({
           <Filter className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <select
             value={priorityFilter}
+            aria-label="Filter tasks by priority"
             onChange={(e) => onPriorityChange(e.target.value as 'ALL' | TaskPriority)}
             className="w-full pl-8 pr-8 py-1.5 text-xs font-medium text-slate-700 bg-slate-50/80 border border-slate-200 rounded-xl focus:outline-none focus:bg-white focus:ring-2 focus:ring-blue-600/15 focus:border-blue-600 transition cursor-pointer appearance-none"
           >

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { Send, MessageSquare, Loader2, Sparkles, User, RefreshCw } from 'lucide-react'
 import { chatService } from '@/services/chat.service'
 import { ChatMessage } from '@/types/chat'
@@ -25,8 +25,7 @@ export function TeamChatPanel({ teamId, teamName }: TeamChatPanelProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
   }
 
-  // 1. Tải lịch sử tin nhắn ban đầu
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       setLoading(true)
       const data = await chatService.getMessages(teamId)
@@ -37,10 +36,28 @@ export function TeamChatPanel({ teamId, teamName }: TeamChatPanelProps) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [teamId])
 
   useEffect(() => {
-    fetchHistory()
+    let isMounted = true
+    chatService.getMessages(teamId)
+      .then((data) => {
+        if (isMounted) {
+          setMessages(data)
+          setLoading(false)
+          setTimeout(() => scrollToBottom(false), 50)
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          console.error('Failed to load chat history:', err)
+          setLoading(false)
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
   }, [teamId])
 
   // 2. Thiết lập kênh Supabase Realtime cho phòng chat
@@ -233,11 +250,12 @@ export function TeamChatPanel({ teamId, teamName }: TeamChatPanelProps) {
       >
         <input
           type="text"
+          aria-label="Type your message to the team"
           placeholder="Type your message to the team... (Press Enter to send)"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           disabled={sending}
-          className="flex-1 bg-slate-50 border border-slate-200/90 text-xs text-slate-800 placeholder-slate-400 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition"
+          className="flex-1 bg-slate-50 border border-slate-200/90 text-xs text-slate-800 placeholder-slate-400 px-4 py-2.5 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-colors"
         />
 
         <button

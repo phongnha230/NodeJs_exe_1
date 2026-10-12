@@ -585,6 +585,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
                       {isOwner && !isMemberOwner ? (
                         <select
                           value={m.role}
+                          aria-label={`Change role for ${m.user.name}`}
                           onChange={(e) =>
                             handleUpdateMemberRole(m.userId, e.target.value as 'ADMIN' | 'MEMBER')
                           }
