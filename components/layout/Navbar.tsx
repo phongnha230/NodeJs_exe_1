@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { CheckSquare, Users, LogIn, LogOut, Database, UserPlus } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { NotificationBell } from '@/components/notifications/NotificationBell'
 
 export function Navbar() {
   const { user, isLoading, logout } = useAuth()
@@ -33,7 +34,7 @@ export function Navbar() {
                 TaskFlow
               </span>
               <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/80">
-                Ass 2
+                Ass 3-4
               </span>
             </div>
           </Link>
@@ -67,7 +68,9 @@ export function Navbar() {
           {isLoading ? (
             <div className="w-20 h-8 bg-slate-100 rounded-lg animate-pulse" />
           ) : user ? (
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2.5">
+              <NotificationBell />
+
               <div className="flex items-center gap-2 px-2.5 py-1 bg-slate-100 rounded-xl text-xs font-medium text-slate-800 border border-slate-200">
                 <span className="w-5 h-5 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
                   {user.name.charAt(0).toUpperCase()}

@@ -65,6 +65,17 @@ export const teamService = {
     if (!res.ok) throw new Error(data.error || 'Failed to remove member')
   },
 
+  async updateMemberRole(teamId: string, userId: string, role: 'ADMIN' | 'MEMBER'): Promise<TeamMemberItem> {
+    const res = await fetch(`/api/teams/${teamId}/members/${userId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Failed to update member role')
+    return data
+  },
+
   async getTeamTasks(teamId: string): Promise<Task[]> {
     const res = await fetch(`/api/teams/${teamId}/tasks`)
     const data = await res.json()

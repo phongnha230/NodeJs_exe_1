@@ -23,6 +23,11 @@ import {
   Kanban,
   List,
   ArrowRight,
+  MessageSquare,
+  Shield,
+  Crown,
+  User,
+  Radio,
 } from 'lucide-react'
 import { Modal } from '@/components/ui/Modal'
 import { Input } from '@/components/ui/Input'
@@ -31,6 +36,8 @@ import { Select } from '@/components/ui/Select'
 import { Button } from '@/components/ui/Button'
 import { TaskPriorityBadge } from '@/components/ui/Badge'
 import { formatDate } from '@/lib/utils'
+import { TeamChatPanel } from '@/components/chat/TeamChatPanel'
+import { createClient } from '@/lib/supabase/client'
 
 export default function TeamDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params)
@@ -43,9 +50,10 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isRealtimeTaskConnected, setIsRealtimeTaskConnected] = useState(false)
 
-  // View Mode: Kanban vs List (Bonus feature)
-  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST'>('KANBAN')
+  // View Mode: Kanban vs List vs Team Chat
+  const [viewMode, setViewMode] = useState<'KANBAN' | 'LIST' | 'CHAT'>('KANBAN')
   const [statusFilter, setStatusFilter] = useState<'ALL' | TaskStatus>('ALL')
 
   // Modals
@@ -97,8 +105,61 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
   }, [user, authLoading, loadTeamData, router])
 
-  // Team Actions (Owner Only)
-  const isOwner = team?.ownerId === user?.id
+  // 3-Tier RBAC calculation
+  const currentUserMember = team?.members?.find((m) => m.userId === user?.id)
+  const isOwner = team?.ownerId === user?.id || currentUserMember?.role === 'OWNER'
+  const isAdmin = currentUserMember?.role === 'ADMIN'
+  const isCanManageMembers = isOwner || isAdmin
+
+  // Real-time Task Board Sync via Supabase Realtime Channel
+  useEffect(() => {
+    if (!teamId) return
+    const supabase = createClient()
+    const taskChannel = supabase.channel(`team-tasks-${teamId}`)
+
+    taskChannel
+      .on('broadcast', { event: 'TASK_EVENT' }, (payload) => {
+        if (!payload?.payload) return
+        const { action, task, taskId } = payload.payload as {
+          action: 'CREATED' | 'UPDATED' | 'DELETED'
+          task?: Task
+          taskId?: string
+        }
+
+        if (action === 'CREATED' && task) {
+          setTasks((prev) => {
+            if (prev.some((t) => t.id === task.id)) return prev
+            return [task, ...prev]
+          })
+        } else if (action === 'UPDATED' && task) {
+          setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...task } : t)))
+        } else if (action === 'DELETED' && taskId) {
+          setTasks((prev) => prev.filter((t) => t.id !== taskId))
+        }
+      })
+      .subscribe((status) => {
+        setIsRealtimeTaskConnected(status === 'SUBSCRIBED')
+      })
+
+    return () => {
+      supabase.removeChannel(taskChannel)
+    }
+  }, [teamId])
+
+  // Helper to broadcast task changes to other online members
+  const broadcastTaskChange = async (payload: { action: 'CREATED' | 'UPDATED' | 'DELETED'; task?: Task; taskId?: string }) => {
+    try {
+      const supabase = createClient()
+      const taskChannel = supabase.channel(`team-tasks-${teamId}`)
+      await taskChannel.send({
+        type: 'broadcast',
+        event: 'TASK_EVENT',
+        payload,
+      })
+    } catch (err) {
+      console.warn('Realtime task broadcast warning:', err)
+    }
+  }
 
   const handleUpdateTeam = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -128,7 +189,25 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  // Member Actions
+  // Member Actions (Role Change & Remove)
+  const handleUpdateMemberRole = async (memberUserId: string, newRole: 'ADMIN' | 'MEMBER') => {
+    try {
+      await teamService.updateMemberRole(teamId, memberUserId, newRole)
+      setTeam((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          members: (prev.members || []).map((m) =>
+            m.userId === memberUserId ? { ...m, role: newRole } : m
+          ),
+        }
+      })
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to update member role'
+      alert(msg)
+    }
+  }
+
   const handleAddMember = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newMemberEmail.trim()) return
@@ -170,7 +249,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     }
   }
 
-  // Task Actions
+  // Task Actions with Real-time Broadcast
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!taskTitle.trim()) return
@@ -194,6 +273,9 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
       setTaskPriority('MEDIUM')
       setTaskDueDate('')
       setTaskAssigneeId('')
+
+      // Realtime Broadcast
+      broadcastTaskChange({ action: 'CREATED', task: newTask })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to create task'
       alert(msg)
@@ -212,7 +294,11 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
 
     try {
       const updated = await taskService.update(task.id, { status: nextStatus })
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? { ...t, ...updated } : t)))
+      const mergedTask = { ...task, ...updated }
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? mergedTask : t)))
+
+      // Realtime Broadcast
+      broadcastTaskChange({ action: 'UPDATED', task: mergedTask })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update task status'
       alert(msg)
@@ -224,6 +310,9 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     try {
       await taskService.delete(task.id)
       setTasks((prev) => prev.filter((t) => t.id !== task.id))
+
+      // Realtime Broadcast
+      broadcastTaskChange({ action: 'DELETED', taskId: task.id })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to delete task'
       alert(msg)
@@ -243,8 +332,12 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
         dueDate: editingTask.dueDate,
         assigneeId: editingTask.assigneeId,
       })
-      setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? { ...t, ...updated } : t)))
+      const mergedTask = { ...editingTask, ...updated }
+      setTasks((prev) => prev.map((t) => (t.id === editingTask.id ? mergedTask : t)))
       setEditingTask(null)
+
+      // Realtime Broadcast
+      broadcastTaskChange({ action: 'UPDATED', task: mergedTask })
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to update task'
       alert(msg)
@@ -289,7 +382,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   // Render Single Task Item
   const renderTaskCard = (t: Task) => {
     const isDone = t.status === 'DONE'
-    const canDelete = t.creatorId === user?.id || t.assigneeId === user?.id || isOwner
+    const canDelete = t.creatorId === user?.id || t.assigneeId === user?.id || isOwner || isAdmin
 
     return (
       <div
@@ -354,7 +447,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
                 <button
                   type="button"
                   onClick={() => handleDeleteTask(t)}
-                  title="Delete task (Authorized)"
+                  title="Delete task (Authorized: Creator, Assignee, Admin, or Owner)"
                   className="p-1 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
@@ -378,19 +471,40 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           >
             <ArrowLeft className="w-3.5 h-3.5" /> All Teams
           </Link>
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2.5 flex-wrap">
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">
               {team.name}
             </h1>
             <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
                 isOwner
-                  ? 'bg-amber-50 text-amber-800 border-amber-200'
-                  : 'bg-blue-50 text-blue-800 border-blue-200'
+                  ? 'bg-amber-50 text-amber-800 border-amber-300'
+                  : isAdmin
+                  ? 'bg-indigo-50 text-indigo-800 border-indigo-300'
+                  : 'bg-slate-100 text-slate-700 border-slate-200'
               }`}
             >
-              {isOwner ? '👑 You are Owner' : 'Member'}
+              {isOwner ? (
+                <>
+                  <Crown className="w-3 h-3 text-amber-500" /> Owner (Full Access)
+                </>
+              ) : isAdmin ? (
+                <>
+                  <Shield className="w-3 h-3 text-indigo-500" /> Admin (Manage Members & Tasks)
+                </>
+              ) : (
+                <>
+                  <User className="w-3 h-3 text-slate-400" /> Member (Own Tasks & View)
+                </>
+              )}
             </span>
+
+            {isRealtimeTaskConnected && (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Task Board Live
+              </span>
+            )}
           </div>
           {team.description && (
             <p className="text-xs sm:text-sm text-slate-500 mt-1 max-w-2xl leading-relaxed">
@@ -437,37 +551,63 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
               </span>
             </div>
 
-            {/* Members List */}
+            {/* Members List with 3-tier Role Controls */}
             <div className="space-y-2.5">
               {team.members?.map((m) => {
                 const isMemberOwner = m.role === 'OWNER'
+                const isMemberAdmin = m.role === 'ADMIN'
+                const canRemove =
+                  (isOwner && !isMemberOwner) ||
+                  (isAdmin && m.role === 'MEMBER')
+
                 return (
                   <div
                     key={m.id}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100"
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/70 border border-slate-100 gap-2"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center text-[10px] font-bold shrink-0 shadow-xs">
                         {m.user.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <p className="text-xs font-semibold text-slate-900 truncate">{m.user.name}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-semibold text-slate-900 truncate">{m.user.name}</p>
+                          {m.userId === user?.id && (
+                            <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded font-bold">You</span>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-400 truncate">{m.user.email}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <span
-                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
-                          isMemberOwner
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-slate-100 text-slate-600 border-slate-200'
-                        }`}
-                      >
-                        {m.role}
-                      </span>
+                      {/* Owner can toggle role between ADMIN and MEMBER */}
+                      {isOwner && !isMemberOwner ? (
+                        <select
+                          value={m.role}
+                          onChange={(e) =>
+                            handleUpdateMemberRole(m.userId, e.target.value as 'ADMIN' | 'MEMBER')
+                          }
+                          className="text-[10px] font-bold py-0.5 px-1.5 bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-hidden focus:ring-1 focus:ring-blue-500 shadow-2xs"
+                        >
+                          <option value="ADMIN">🛡️ ADMIN</option>
+                          <option value="MEMBER">👤 MEMBER</option>
+                        </select>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded border ${
+                            isMemberOwner
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : isMemberAdmin
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : 'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}
+                        >
+                          {isMemberOwner ? '👑 OWNER' : isMemberAdmin ? '🛡️ ADMIN' : '👤 MEMBER'}
+                        </span>
+                      )}
 
-                      {isOwner && !isMemberOwner && (
+                      {canRemove && (
                         <button
                           type="button"
                           onClick={() => handleRemoveMember(m)}
@@ -483,8 +623,8 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
               })}
             </div>
 
-            {/* Add Member Button (Owner only) */}
-            {isOwner && (
+            {/* Add Member Button (Owner or Admin) */}
+            {isCanManageMembers && (
               <button
                 type="button"
                 onClick={() => setIsAddMemberOpen(true)}
@@ -497,9 +637,9 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
           </div>
         </div>
 
-        {/* Right Column: Tasks Board with Kanban Toggle (8 cols) */}
+        {/* Right Column: Tasks Board & Live Chat (8 cols) */}
         <div className="lg:col-span-8 space-y-4">
-          {/* Controls Bar: View Toggle & Action */}
+          {/* Controls Bar: View Toggle (Kanban, List, Chat) & Action */}
           <div className="bg-white p-3 rounded-2xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="inline-flex p-1 bg-slate-100 rounded-xl gap-1">
@@ -526,6 +666,18 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
                 >
                   <List className="w-3.5 h-3.5" />
                   List View
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('CHAT')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded-lg transition-all ${
+                    viewMode === 'CHAT'
+                      ? 'bg-white text-blue-700 shadow-xs font-bold'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <MessageSquare className="w-3.5 h-3.5 text-indigo-600" />
+                  💬 Team Chat
                 </button>
               </div>
 
@@ -556,8 +708,10 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
             </Button>
           </div>
 
-          {/* Kanban Board View (Bonus Marks) */}
-          {viewMode === 'KANBAN' ? (
+          {/* Kanban Board View vs List View vs Team Chat */}
+          {viewMode === 'CHAT' ? (
+            <TeamChatPanel teamId={teamId} teamName={team.name} />
+          ) : viewMode === 'KANBAN' ? (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
               {/* Column 1: To Do */}
               <div className="bg-slate-100/60 p-3 rounded-2xl border border-slate-200/80 space-y-3">

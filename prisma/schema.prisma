@@ -43,10 +43,12 @@ model User {
   updatedAt     DateTime     @updatedAt
 
   // Quan hệ
-  ownedTeams    Team[]       @relation("TeamOwner")
+  ownedTeams    Team[]         @relation("TeamOwner")
   memberships   TeamMember[]
-  assignedTasks Task[]       @relation("AssignedTasks")
-  createdTasks  Task[]       @relation("CreatedTasks")
+  assignedTasks Task[]         @relation("AssignedTasks")
+  createdTasks  Task[]         @relation("CreatedTasks")
+  chatMessages  ChatMessage[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -61,9 +63,10 @@ model Team {
   updatedAt   DateTime     @updatedAt
 
   // Quan hệ
-  owner       User         @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members     TeamMember[]
-  tasks       Task[]
+  owner        User          @relation("TeamOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members      TeamMember[]
+  tasks        Task[]
+  chatMessages ChatMessage[]
 
   @@map("teams")
 }
@@ -108,4 +111,36 @@ model Task {
   creator     User?         @relation("CreatedTasks", fields: [creatorId], references: [id], onDelete: SetNull)
 
   @@map("tasks")
+}
+
+// Model 5: Tin nhắn trong phòng chat của nhóm (Assignment 3 & 4)
+model ChatMessage {
+  id        String   @id @default(cuid())
+  content   String
+  teamId    String
+  senderId  String
+  createdAt DateTime @default(now())
+
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([teamId, createdAt])
+  @@map("chat_messages")
+}
+
+// Model 6: Thông báo trong hệ thống (Assignment 3 & 4)
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  content   String
+  type      String   // "TASK_ASSIGNED" | "ADDED_TO_TEAM"
+  link      String?  // Đường dẫn đến trang team/task liên quan
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
 }

@@ -3,7 +3,7 @@ import { getAuthenticatedUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { Role } from '@prisma/client'
 
-// POST /api/teams/:id/members – Add a member to a team by email (Owner only)
+// POST /api/teams/:id/members – Add a member to a team by email (Owner or Admin)
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -23,7 +23,7 @@ export async function POST(
       return NextResponse.json({ error: 'Member email is required' }, { status: 400 })
     }
 
-    // 1. Kiểm tra quyền Owner của người thực hiện
+    // 1. Kiểm tra quyền của người thực hiện (Owner hoặc Admin)
     const currentMembership = await prisma.teamMember.findUnique({
       where: {
         teamId_userId: {
@@ -33,8 +33,11 @@ export async function POST(
       },
     })
 
-    if (!currentMembership || currentMembership.role !== Role.OWNER) {
-      return NextResponse.json({ error: 'Forbidden. Only the team Owner can add members.' }, { status: 403 })
+    if (!currentMembership || (currentMembership.role !== Role.OWNER && currentMembership.role !== Role.ADMIN)) {
+      return NextResponse.json(
+        { error: 'Forbidden. Only the Team Owner or Admins can add members.' },
+        { status: 403 }
+      )
     }
 
     // 2. Tìm người dùng theo email trong cơ sở dữ liệu
@@ -68,12 +71,28 @@ export async function POST(
       data: {
         teamId,
         userId: targetUser.id,
-        role: role === 'ADMIN' ? Role.ADMIN : Role.MEMBER,
+        role: role === 'ADMIN' && currentMembership.role === Role.OWNER ? Role.ADMIN : Role.MEMBER,
       },
       include: {
         user: {
           select: { id: true, name: true, email: true },
         },
+      },
+    })
+
+    // 5. Tạo thông báo (Notification) cho thành viên mới
+    const teamInfo = await prisma.team.findUnique({
+      where: { id: teamId },
+      select: { name: true },
+    })
+
+    await prisma.notification.create({
+      data: {
+        userId: targetUser.id,
+        title: 'Added to team',
+        content: `You have been added to team "${teamInfo?.name || 'Workspace'}" by ${user.name}.`,
+        type: 'ADDED_TO_TEAM',
+        link: `/teams/${teamId}`,
       },
     })
 

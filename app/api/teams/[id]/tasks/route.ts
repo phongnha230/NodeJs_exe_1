@@ -124,6 +124,23 @@ export async function POST(
       },
     })
 
+    // 3. Tạo thông báo nếu được giao cho thành viên khác
+    if (assigneeId && assigneeId !== user.id) {
+      const teamInfo = await prisma.team.findUnique({
+        where: { id: teamId },
+        select: { name: true },
+      })
+      await prisma.notification.create({
+        data: {
+          userId: assigneeId,
+          title: 'Task Assigned',
+          content: `${user.name} assigned you a task "${newTask.title}" in "${teamInfo?.name || 'Workspace'}".`,
+          type: 'TASK_ASSIGNED',
+          link: `/teams/${teamId}`,
+        },
+      })
+    }
+
     return NextResponse.json(newTask, { status: 201 })
   } catch (error: unknown) {
     console.error('POST /api/teams/:id/tasks Error:', error)

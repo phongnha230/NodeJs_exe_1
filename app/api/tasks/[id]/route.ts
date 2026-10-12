@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthenticatedUser } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { TaskStatus, TaskPriority } from '@prisma/client'
+import { TaskStatus, TaskPriority, Role } from '@prisma/client'
 
 // PUT /api/tasks/:id – Update a task (Members can update task status, priority, and details)
 export async function PUT(
@@ -109,6 +109,22 @@ export async function PUT(
       },
     })
 
+    // Thông báo nếu có người mới được gán việc
+    if (assigneeId && assigneeId !== existingTask.assigneeId && assigneeId !== user.id) {
+      const teamInfo = existingTask.teamId
+        ? await prisma.team.findUnique({ where: { id: existingTask.teamId }, select: { name: true } })
+        : null
+      await prisma.notification.create({
+        data: {
+          userId: assigneeId,
+          title: 'Task Assigned',
+          content: `${user.name} assigned you to task "${updatedTask.title}" in "${teamInfo?.name || 'Workspace'}".`,
+          type: 'TASK_ASSIGNED',
+          link: existingTask.teamId ? `/teams/${existingTask.teamId}` : '/teams',
+        },
+      })
+    }
+
     return NextResponse.json(updatedTask)
   } catch (error: unknown) {
     console.error('PUT /api/tasks/:id Error:', error)
@@ -117,7 +133,7 @@ export async function PUT(
 }
 
 // DELETE /api/tasks/:id – Delete a task
-// Rule: Only the task creator, the assignee, or the team Owner can delete a task.
+// Rule: Task creator, assignee, team Admin, or team Owner can delete a task.
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -146,17 +162,16 @@ export async function DELETE(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 })
     }
 
-    // Kiểm tra quyền xóa:
-    // 1. Is Task Creator?
+    // Kiểm tra quyền xóa (3-tier RBAC):
+    const userMembership = existingTask.team?.members.find((m) => m.userId === user.id)
     const isCreator = existingTask.creatorId === user.id
-    // 2. Is Task Assignee?
     const isAssignee = existingTask.assigneeId === user.id
-    // 3. Is Team Owner?
-    const isTeamOwner = existingTask.team?.ownerId === user.id
+    const isTeamOwner = existingTask.team?.ownerId === user.id || userMembership?.role === Role.OWNER
+    const isTeamAdmin = userMembership?.role === Role.ADMIN
 
-    if (!isCreator && !isAssignee && !isTeamOwner) {
+    if (!isCreator && !isAssignee && !isTeamOwner && !isTeamAdmin) {
       return NextResponse.json(
-        { error: 'Forbidden. Only the task creator, assignee, or team owner can delete this task.' },
+        { error: 'Forbidden. Only the task creator, assignee, team admin, or owner can delete this task.' },
         { status: 403 }
       )
     }
