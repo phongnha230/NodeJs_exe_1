@@ -75,8 +75,10 @@ export function NotificationBell() {
     }
   }, [isOpen])
 
-  const handleMarkAsRead = async (id: string, e: React.MouseEvent) => {
-    e.stopPropagation()
+  const handleMarkAsRead = async (id: string, e?: React.MouseEvent) => {
+    if (e && typeof e.stopPropagation === 'function') {
+      e.stopPropagation()
+    }
     try {
       await notificationService.markAsRead(id)
       setNotifications((prev) =>
@@ -191,8 +193,8 @@ export function NotificationBell() {
                       {notif.link ? (
                         <Link
                           href={notif.link}
-                          onClick={() => {
-                            if (!notif.isRead) handleMarkAsRead(notif.id, {} as React.MouseEvent)
+                          onClick={(e) => {
+                            if (!notif.isRead) handleMarkAsRead(notif.id, e)
                             setIsOpen(false)
                           }}
                           className="text-[11px] font-semibold text-blue-600 hover:text-blue-700 flex items-center gap-1"
