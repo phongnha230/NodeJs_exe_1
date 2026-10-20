@@ -171,7 +171,10 @@ export function NotificationBell() {
                       <p className="text-xs font-bold text-slate-900 truncate">
                         {notif.title}
                       </p>
-                      <span className="text-[10px] text-slate-400 flex items-center gap-0.5 shrink-0">
+                      <span
+                        suppressHydrationWarning
+                        className="text-[10px] text-slate-400 flex items-center gap-0.5 shrink-0"
+                      >
                         <Clock className="w-2.5 h-2.5" />
                         {new Date(notif.createdAt).toLocaleTimeString([], {
                           hour: '2-digit',
