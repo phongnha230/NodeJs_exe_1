@@ -52,7 +52,13 @@ export const teamService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     })
-    const data = await res.json()
+    const text = await res.text()
+    let data: any = {}
+    try {
+      data = text ? JSON.parse(text) : {}
+    } catch {
+      throw new Error(`Server returned unexpected response (status ${res.status}): ${text.slice(0, 100)}`)
+    }
     if (!res.ok) throw new Error(data.error || 'Failed to add member')
     return data
   },
